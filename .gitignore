@@ -1,0 +1,12 @@
+node_modules/
+__pycache__/
+venv/
+env/
+.env
+uploads/
+dataset/
+models/
+*.h5
+*.pkl
+.DS_Store
+*.pyc
