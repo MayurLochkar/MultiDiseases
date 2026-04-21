@@ -1,0 +1,73 @@
+[
+  {
+    "id": 1776710576418,
+    "patientName": "Roshni",
+    "patientAge": "18",
+    "patientGender": "Female",
+    "diseaseType": "Pneumonia",
+    "result": "PNEUMONIA",
+    "advancedReport": {
+      "type": "Bronchopneumonia",
+      "localization": "Right Upper Lobe",
+      "severity": "Severe",
+      "infected_area": "0%",
+      "findings": [
+        "Bilateral consolidation detected",
+        "Ground-glass opacity (GGO) noted",
+        "Pleural effusion risk: High"
+      ],
+      "complications": [
+        "Respiratory Failure risk"
+      ],
+      "cause": "Viral (Likely COVID-19/Influenza)"
+    },
+    "date": "2026-04-20T18:42:56.412Z"
+  },
+  {
+    "id": 1776710268139,
+    "patientName": "Roshni",
+    "patientAge": "18",
+    "patientGender": "Female",
+    "diseaseType": "Pneumonia",
+    "result": "PNEUMONIA",
+    "advancedReport": {
+      "type": "Lobar Pneumonia",
+      "localization": "Right Upper Lobe",
+      "severity": "Severe",
+      "infected_area": "0%",
+      "findings": [
+        "Focal consolidation found",
+        "Dense opacification",
+        "Pleural effusion risk: High"
+      ],
+      "complications": [
+        "Respiratory Failure risk"
+      ],
+      "cause": "Bacterial (S. pneumoniae)"
+    },
+    "date": "2026-04-20T18:37:48.134Z"
+  },
+  {
+    "id": 1776709144705,
+    "patientName": "Rahul",
+    "patientAge": "20",
+    "patientGender": "Male",
+    "diseaseType": "BrainTumor",
+    "result": "TUMOR",
+    "advancedReport": {
+      "localization": "Right Hemisphere, Frontal Lobe",
+      "severity": "Critical",
+      "tumor_size_est": "26 mm",
+      "findings": [
+        "Mass effect detected",
+        "Midline shift risk"
+      ],
+      "complications": [
+        "Cerebral edema",
+        "Increased ICP"
+      ],
+      "type_estimate": "Malignant Glioma"
+    },
+    "date": "2026-04-20T18:19:04.649Z"
+  }
+]

@@ -1,3 +1,5 @@
+require("dotenv").config(); // ✅ Load XAI_API_KEY from .env
+
 const express = require("express");
 const cors = require("cors");
 
@@ -6,6 +8,8 @@ const brainRoute = require("./routes/brain");
 const skinRoute = require("./routes/skin");
 const heartRoute = require("./routes/heart");
 const diabetesRoute = require("./routes/diabetes");
+const recordsRoute = require("./routes/records");
+const chatRoute = require("./routes/chat"); // 🤖 AI Chatbot proxy
 
 const app = express();
 
@@ -17,7 +21,9 @@ app.use("/api/brain", brainRoute);
 app.use("/api/skin", skinRoute);
 app.use("/api/heart", heartRoute);
 app.use("/api/diabetes", diabetesRoute);
+app.use("/api/records", recordsRoute);
+app.use("/api/chat", chatRoute); // 🤖 xAI Grok proxy
 
 app.listen(5001, () => {
   console.log("Node server running on port 5001");
-});
+});

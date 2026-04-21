@@ -2,9 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   FaBrain, FaCloudUploadAlt, FaMicroscope, FaCheckCircle, 
-  FaExclamationTriangle, FaFileMedicalAlt, FaArrowRight, FaDna
+  FaExclamationTriangle, FaFileMedicalAlt, FaArrowRight, FaDna, FaUser
 } from "react-icons/fa";
 import { BiScan, BiPulse, BiLoaderAlt } from "react-icons/bi";
+import VoiceAssistant from "../components/VoiceAssistant";
+import DoctorSuggestion from "../components/DoctorSuggestion";
+import HospitalMap from "../components/HospitalMap";
+import AdvancedReport from "../components/AdvancedReport";
+import EmergencyAlert from "../components/EmergencyAlert";
 
 // --- ANIMATION VARIANTS ---
 const containerVar = {
@@ -22,10 +27,14 @@ const itemVar = {
 
 export default function BrainTumor() {
   const [image, setImage] = useState(null);
+  const [patientName, setPatientName] = useState("");
+  const [patientAge, setPatientAge] = useState("");
+  const [patientGender, setPatientGender] = useState("Male");
   const [preview, setPreview] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
   const [logs, setLogs] = useState([]);
+  const [showEmergency, setShowEmergency] = useState(false);
   const logsEndRef = useRef(null);
 
   // Auto-scroll logs
@@ -34,7 +43,7 @@ export default function BrainTumor() {
   }, [logs]);
 
   const addLog = (msg, type = "info") => {
-    setLogs(prev => [...prev, { msg, type, id: Date.now() }]);
+    setLogs(prev => [...prev, { msg, type, id: `${Date.now()}-${Math.random()}` }]);
   };
 
   const handleImageChange = (e) => {
@@ -70,33 +79,71 @@ export default function BrainTumor() {
 
     addLog("Model inference complete.", "success");
 
+    const diagResult = data.prediction === "TUMOR" ? "Brain Tumor Detected" : "No Tumor Detected";
+    const confVal = (data.confidence * 100).toFixed(2);
+
     setResult({
-      diagnosis: data.prediction === "TUMOR"
-        ? "Brain Tumor Detected"
-        : "No Tumor Detected",
-
-      confidence: (data.confidence * 100).toFixed(2),
-
-      severity: data.prediction === "TUMOR"
-        ? "High Risk"
-        : "Normal",
-
+      diagnosis: diagResult,
+      confidence: confVal,
+      severity: data.prediction === "TUMOR" ? "High Risk" : "Normal",
       desc: "Prediction generated using trained CNN model.",
-      gradcam: data.gradcam
+      gradcam: data.gradcam,
+      advanced_report: data.advanced_report
     });
 
-  } catch (err) {
+    // Sync with Chatbot
+    localStorage.setItem('latest_diagnosis', JSON.stringify({
+      disease: "Brain Tumor",
+      result: diagResult,
+      confidence: confVal
+    }));
 
+    if (data.prediction === "TUMOR") {
+      setShowEmergency(true);
+    }
+
+    if (patientName) {
+      saveToRecords(data);
+    }
+
+  } catch (err) {
     console.log(err);
     addLog("Server connection failed.", "warning");
-
   }
 
   setIsAnalyzing(false);
 };
 
+const saveToRecords = async (predictionData) => {
+  try {
+    await fetch("http://localhost:5001/api/records", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        patientName,
+        patientAge,
+        patientGender,
+        diseaseType: "BrainTumor",
+        result: predictionData.prediction,
+        confidence: (predictionData.confidence * 100).toFixed(2),
+        gradcam: predictionData.gradcam,
+        advancedReport: predictionData.advanced_report,
+        date: new Date().toISOString()
+      })
+    });
+  } catch (error) {
+    console.error("Error saving record:", error);
+  }
+};
+
   return (
     <div className="min-h-screen bg-[#FDFEFF] text-slate-800 font-sans pt-32 pb-10 px-6 overflow-hidden">
+      <EmergencyAlert 
+        isOpen={showEmergency} 
+        onClose={() => setShowEmergency(false)} 
+        diseaseType="BrainTumor"
+        severity={result?.severity || "High Risk"}
+      />
       
       {/* Background Animated Gradient Blobs */}
       <div className="fixed inset-0 pointer-events-none -z-10">
@@ -112,7 +159,7 @@ export default function BrainTumor() {
         />
       </div>
 
-      <div className="max-w-7xl mx-auto">
+      <div className="w-full max-w-[1900px] mx-auto px-6 lg:px-12">
         
         {/* --- HEADER --- */}
         <motion.div 
@@ -128,6 +175,31 @@ export default function BrainTumor() {
               Neural <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Scan AI</span>
             </h1>
             <p className="text-slate-500 mt-2 text-lg font-medium">Advanced MRI Segmentation & Classification.</p>
+          </div>
+          <div className="bg-white p-3 rounded-2xl shadow-xl border border-blue-50 flex items-center gap-3">
+             <input 
+                type="text" 
+                placeholder="Patient Name" 
+                value={patientName}
+                onChange={(e) => setPatientName(e.target.value)}
+                className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none w-48 font-bold"
+              />
+              <input 
+                type="number" 
+                placeholder="Age" 
+                value={patientAge}
+                onChange={(e) => setPatientAge(e.target.value)}
+                className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none w-20 font-bold"
+              />
+              <select
+                value={patientGender}
+                onChange={(e) => setPatientGender(e.target.value)}
+                className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+              >
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
           </div>
         </motion.div>
 
@@ -310,6 +382,35 @@ export default function BrainTumor() {
                       Download Full Report 
                       <FaArrowRight className="group-hover:translate-x-1 transition-transform" />
                     </button>
+
+                    {result && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-12 space-y-12 border-t border-slate-100 pt-12"
+                      >
+                        {/* 1st Row: Full Width Clinical Report */}
+                        <div className="w-full">
+                          <AdvancedReport 
+                            data={result.advanced_report} 
+                            diseaseType="BrainTumor" 
+                            confidence={result.confidence}
+                            gradcam={result.gradcam}
+                            patientInfo={{ name: patientName, age: patientAge, gender: patientGender }}
+                          />
+                        </div>
+
+                        {/* 2nd Row: Full Width Doctor Suggestion */}
+                        <div className="w-full">
+                          <DoctorSuggestion diseaseType="BrainTumor" />
+                        </div>
+
+                        {/* 3rd Row: MASSIVE Full Width Horizontal Map */}
+                        <div id="hospital-map" className="w-full rounded-[3rem] overflow-hidden shadow-3xl border border-slate-100 h-[600px]">
+                           <HospitalMap diseaseType="BrainTumor" />
+                        </div>
+                      </motion.div>
+                    )}
                   </div>
                 </motion.div>
               )}

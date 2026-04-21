@@ -1,9 +1,16 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaLungs, FaCloudUploadAlt, FaCheckCircle, FaExclamationTriangle, FaChartBar, FaRedo } from "react-icons/fa";
+import VoiceAssistant from "../components/VoiceAssistant";
+import DoctorSuggestion from "../components/DoctorSuggestion";
+import HospitalMap from "../components/HospitalMap";
+import AdvancedReport from "../components/AdvancedReport";
 
 export default function Pneumonia() {
   const [selectedImage, setSelectedImage] = useState(null);
+  const [patientName, setPatientName] = useState("");
+  const [patientAge, setPatientAge] = useState("");
+  const [patientGender, setPatientGender] = useState("Male");
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -35,13 +42,39 @@ export default function Pneumonia() {
 
       const data = await response.json();
 
-      setResult({
+      if (data.error) {
+        setResult({
+          prediction: "Invalid File Upload",
+          confidence: "0.00",
+          status: "positive", // Use 'positive' so it renders the red alert box
+          details: data.error,
+          gradcam: null
+        });
+        setLoading(false);
+        return;
+      }
+
+      const resultData = {
         prediction: data.prediction,
         confidence: (data.confidence * 100).toFixed(2),
         status: data.prediction === "PNEUMONIA" ? "positive" : "negative",
         details: "Prediction generated using trained CNN model.",
-        gradcam: data.gradcam
-      });
+        gradcam: data.gradcam,
+        advanced_report: data.advanced_report
+      };
+
+      setResult(resultData);
+
+      // Sync with Chatbot
+      localStorage.setItem('latest_diagnosis', JSON.stringify({
+        disease: "Pneumonia",
+        result: data.prediction,
+        confidence: resultData.confidence
+      }));
+
+      if (patientName) {
+        saveToRecords(data);
+      }
 
     } catch (error) {
       console.error("Error:", error);
@@ -51,9 +84,31 @@ export default function Pneumonia() {
     setLoading(false);
   };
 
+  const saveToRecords = async (predictionData) => {
+    try {
+      await fetch("http://localhost:5001/api/records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientName,
+          patientAge,
+          patientGender,
+          diseaseType: "Pneumonia",
+          result: predictionData.prediction,
+          confidence: (predictionData.confidence * 100).toFixed(2),
+          gradcam: predictionData.gradcam,
+          advancedReport: predictionData.advanced_report,
+          date: new Date().toISOString()
+        })
+      });
+    } catch (error) {
+      console.error("Error saving record:", error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#f8fafc] pt-28 pb-20 px-6">
-      <div className="max-w-5xl mx-auto">
+      <div className="w-full max-w-[1900px] mx-auto px-6 lg:px-12">
 
         {/* Header */}
         <motion.div
@@ -82,9 +137,36 @@ export default function Pneumonia() {
             animate={{ opacity: 1, x: 0 }}
             className="bg-white p-8 rounded-[2.5rem] shadow-2xl shadow-blue-100 border border-slate-100"
           >
-            <div className="mb-6">
-              <h3 className="text-xl font-bold text-slate-800">Step 1: Upload X-Ray</h3>
-              <p className="text-sm text-slate-400">Supported formats: JPG, PNG, JPEG</p>
+            <div className="mb-6 flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-bold text-slate-800">Step 1: Upload X-Ray</h3>
+                <p className="text-sm text-slate-400">Supported formats: JPG, PNG, JPEG</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <input 
+                  type="text" 
+                  placeholder="Patient Name" 
+                  value={patientName}
+                  onChange={(e) => setPatientName(e.target.value)}
+                  className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none w-32 font-bold"
+                />
+                <input 
+                  type="number" 
+                  placeholder="Age" 
+                  value={patientAge}
+                  onChange={(e) => setPatientAge(e.target.value)}
+                  className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none w-16 font-bold"
+                />
+                <select
+                  value={patientGender}
+                  onChange={(e) => setPatientGender(e.target.value)}
+                  className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
             </div>
 
             <label className="relative group cursor-pointer block">
@@ -153,9 +235,14 @@ export default function Pneumonia() {
                       }`}>
                         {result.prediction}
                       </h3>
-                      <p className="text-slate-500 font-medium">
+                      <p className="text-slate-500 font-medium mb-4">
                         Confidence: {result.confidence}%
                       </p>
+                      {/* Voice Assistant Module */}
+                      <VoiceAssistant 
+                        message={result.status === "positive" ? "Aapko shayad Pneumonia ho sakta hai. Kripya Pulmonologist se consult karein." : "Koi pneumonia detect nahi hua, aap healthy hain."} 
+                        startSpeaking={true} 
+                      />
                     </div>
 
                     {result.status === "positive" ? (
@@ -184,6 +271,36 @@ export default function Pneumonia() {
                         className="w-full rounded-xl shadow-[0_10px_20px_-10px_rgba(0,0,0,0.15)] border border-slate-200" 
                       />
                     </div>
+                  )}
+
+                  {/* Doctor & Hospital Suggestions for Positive Cases */}
+                  {result && result.advanced_report && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-12 space-y-12 border-t border-slate-100 pt-12"
+                    >
+                      {/* 1st Row: Full Width Clinical Report */}
+                      <div className="w-full">
+                        <AdvancedReport 
+                          data={result.advanced_report} 
+                          diseaseType="Pneumonia" 
+                          confidence={result.confidence}
+                          gradcam={result.gradcam}
+                          patientInfo={{ name: patientName, age: patientAge, gender: patientGender }}
+                        />
+                      </div>
+
+                      {/* 2nd Row: Full Width Doctor Suggestion */}
+                      <div className="w-full">
+                        <DoctorSuggestion diseaseType="Pneumonia" />
+                      </div>
+
+                      {/* 3rd Row: MASSIVE Full Width Horizontal Map */}
+                      <div id="hospital-map" className="w-full rounded-[3rem] overflow-hidden shadow-3xl border border-slate-100 h-[600px]">
+                        <HospitalMap diseaseType="Pneumonia" />
+                      </div>
+                    </motion.div>
                   )}
 
                   <button

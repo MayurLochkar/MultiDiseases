@@ -9,6 +9,12 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+import VoiceAssistant from "../components/VoiceAssistant";
+import DoctorSuggestion from "../components/DoctorSuggestion";
+import HospitalMap from "../components/HospitalMap";
+import AdvancedReport from "../components/AdvancedReport";
+import EmergencyAlert from "../components/EmergencyAlert";
+
 export default function Heart() {
   // Ab poore 13 parameters add kar diye hain as per your screenshot
   const [form, setForm] = useState({
@@ -27,8 +33,12 @@ export default function Heart() {
     thal: ""
   });
 
+  const [patientName, setPatientName] = useState("");
+  const [patientAge, setPatientAge] = useState("");
+  const [patientGender, setPatientGender] = useState("Male");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showEmergency, setShowEmergency] = useState(false);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: Number(e.target.value) });
@@ -47,10 +57,45 @@ export default function Heart() {
 
       const data = await res.json();
       setResult(data);
+      
+      // Sync with Chatbot
+      localStorage.setItem('latest_diagnosis', JSON.stringify({
+        disease: "Heart Disease",
+        result: data.prediction,
+        confidence: data.risk_score >= 5 ? "High" : "Normal"
+      }));
+
+      if (data.risk_score >= 5) {
+        setShowEmergency(true);
+      }
+      if (patientName) {
+        saveToRecords(data);
+      }
     } catch (error) {
       console.error("Error fetching prediction:", error);
     }
     setLoading(false);
+  };
+
+  const saveToRecords = async (predictionData) => {
+    try {
+      await fetch("http://localhost:5001/api/records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientName,
+          patientAge,
+          patientGender,
+          diseaseType: "Heart",
+          result: predictionData.prediction,
+          confidence: predictionData.risk_score >= 5 ? "High Risk" : "Normal Risk",
+          advancedReport: predictionData.advanced_report,
+          date: new Date().toISOString()
+        })
+      });
+    } catch (error) {
+      console.error("Error saving record:", error);
+    }
   };
 
   // Graph Data (Important vitals ke liye)
@@ -65,8 +110,15 @@ export default function Heart() {
   const riskScore = isHighRisk ? 85 : result ? 15 : 0;
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] py-10 px-4 sm:px-6 lg:px-8 font-sans text-slate-800">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-[#FDFEFF] text-slate-800 font-sans pt-32 pb-16 px-6 overflow-hidden">
+      <div className="w-full max-w-[1900px] mx-auto px-6 lg:px-12">
+      <EmergencyAlert 
+        isOpen={showEmergency} 
+        onClose={() => setShowEmergency(false)} 
+        diseaseType="Heart"
+        severity={result?.prediction || "High Risk"}
+      />
+      <div className="space-y-6">
 
         {/* Header */}
         <div className="text-center md:text-left ml-2">
@@ -80,7 +132,34 @@ export default function Heart() {
 
           {/* LEFT: FORM SECTION (Updated to fit 13 fields cleanly) */}
           <div className="lg:col-span-6 bg-white rounded-3xl shadow-lg shadow-slate-200/40 p-6 sm:p-8 border border-slate-100">
-            <h2 className="text-xl font-extrabold text-[#1e293b] mb-6">Patient Vitals</h2>
+            <h2 className="text-xl font-extrabold text-[#1e293b] mb-6 flex justify-between items-center">
+            Patient Vitals
+            <div className="flex items-center gap-2">
+              <input 
+                type="text" 
+                placeholder="Patient Name" 
+                value={patientName}
+                onChange={(e) => setPatientName(e.target.value)}
+                className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-purple-500 outline-none w-32 font-bold"
+              />
+              <input 
+                type="number" 
+                placeholder="Age" 
+                value={patientAge}
+                onChange={(e) => setPatientAge(e.target.value)}
+                className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-purple-500 outline-none w-16 font-bold"
+              />
+              <select
+                value={patientGender}
+                onChange={(e) => setPatientGender(e.target.value)}
+                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-purple-500 outline-none font-bold"
+              >
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-5">
 
@@ -175,7 +254,6 @@ export default function Heart() {
           {/* RIGHT: RESULTS & VISUALS */}
           <div className="lg:col-span-6 flex flex-col gap-6">
 
-            {/* Graph Card */}
             <div className="bg-white rounded-3xl shadow-lg shadow-slate-200/40 p-6 sm:p-8 border border-slate-100 flex-1 flex flex-col min-h-[300px]">
               <h3 className="text-xl font-extrabold text-slate-800 mb-6">Real-time Vitals Chart</h3>
 
@@ -204,8 +282,14 @@ export default function Heart() {
               <div className={`rounded-3xl shadow-lg p-6 sm:p-8 border transition-all duration-500 ${isHighRisk ? 'bg-[#fff1f2] border-[#ffe4e6]' : 'bg-[#f0fdf4] border-[#dcfce7]'}`}>
 
                 <div className="mb-5">
-                  <div className="flex justify-between items-end mb-3">
-                    <h3 className="text-xl font-extrabold text-slate-800">AI Assessment</h3>
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="text-xl font-extrabold text-slate-800 mb-2">AI Assessment</h3>
+                      <VoiceAssistant 
+                        message={isHighRisk ? "Heart risk detect hua hai. Kripya kisi Cardiology specialist ko zaroor dikhayein." : "Aapki heart health completely stable hai."} 
+                        startSpeaking={true} 
+                      />
+                    </div>
                     <span className={`text-sm font-bold px-3 py-1 rounded-full ${isHighRisk ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
                       {result.prediction}
                     </span>
@@ -250,12 +334,39 @@ export default function Heart() {
                   )}
                 </div>
 
+                {result && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-12 space-y-12 border-t border-slate-100 pt-12"
+                  >
+                    {/* 1st Row: Full Width Clinical Report */}
+                    <div className="w-full">
+                      <AdvancedReport 
+                        data={result.advanced_report} 
+                        diseaseType="Heart" 
+                        patientInfo={{ name: patientName, age: patientAge, gender: patientGender }}
+                      />
+                    </div>
+
+                    {/* 2nd Row: Full Width Doctor Suggestion */}
+                    <div className="w-full">
+                      <DoctorSuggestion diseaseType="Heart" />
+                    </div>
+
+                    {/* 3rd Row: MASSIVE Full Width Horizontal Map */}
+                    <div id="hospital-map" className="w-full rounded-[3rem] overflow-hidden shadow-3xl border border-slate-100 h-[600px]">
+                      <HospitalMap diseaseType="Heart" />
+                    </div>
+                  </motion.div>
+                )}
+
               </div>
             )}
-
           </div>
         </div>
       </div>
     </div>
+  </div>
   );
 }

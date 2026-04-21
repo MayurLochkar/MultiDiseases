@@ -2,11 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FaCloudUploadAlt, FaMicroscope, FaCheckCircle,
-  FaExclamationTriangle, FaTrashAlt, FaNotesMedical, FaDna, FaArrowRight
+  FaExclamationTriangle, FaTrashAlt, FaNotesMedical, FaDna, FaArrowRight, FaUser
 } from "react-icons/fa";
 import { GiCancer } from "react-icons/gi";
 import { BiScan, BiPulse, BiLoaderAlt } from "react-icons/bi";
-
+import VoiceAssistant from "../components/VoiceAssistant";
+import DoctorSuggestion from "../components/DoctorSuggestion";
+import HospitalMap from "../components/HospitalMap";
+import AdvancedReport from "../components/AdvancedReport";
 // --- ANIMATION VARIANTS ---
 const itemVar = {
   hidden: { opacity: 0, x: 20 },
@@ -15,6 +18,9 @@ const itemVar = {
 
 export default function SkinCancer() {
   const [image, setImage] = useState(null);
+  const [patientName, setPatientName] = useState("");
+  const [patientAge, setPatientAge] = useState("");
+  const [patientGender, setPatientGender] = useState("Male");
   const [preview, setPreview] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
@@ -27,7 +33,7 @@ export default function SkinCancer() {
   }, [logs]);
 
   const addLog = (msg, type = "info") => {
-    setLogs(prev => [...prev, { msg, type, id: crypto.randomUUID() }]);
+    setLogs(prev => [...prev, { msg, type, id: `${Date.now()}-${Math.random()}` }]);
   };
 
   const handleImageChange = (e) => {
@@ -83,7 +89,14 @@ export default function SkinCancer() {
 
       // Handle error from server
       if (data.error) {
-        console.error("Server error:", data.error);
+        addLog("Analysis aborted due to invalid scan.", "warning");
+        setResult({
+          diagnosis: "Invalid Image",
+          confidence: "0.00",
+          severity: "High Risk",
+          notes: data.error,
+          gradcam: null
+        });
         setIsAnalyzing(false);
         return;
       }
@@ -110,20 +123,55 @@ export default function SkinCancer() {
       setTimeout(() => {
         addLog("Analysis Complete. Compiling diagnostic report...", "success");
 
+        const confVal = (data.confidence * 100).toFixed(2);
+        
         setResult({
           diagnosis,
-          confidence: (data.confidence * 100).toFixed(2),
+          confidence: confVal,
           severity,
           notes,
-          gradcam: data.gradcam
+          gradcam: data.gradcam,
+          advanced_report: data.advanced_report
         });
+
+        // Sync with Chatbot
+        localStorage.setItem('latest_diagnosis', JSON.stringify({
+          disease: "Skin Cancer",
+          result: diagnosis,
+          confidence: confVal
+        }));
+
+        if (patientName) {
+          saveToRecords(data, diagnosis);
+        }
 
         setIsAnalyzing(false);
       }, 4800);
-
     } catch (error) {
       console.error(error);
       setIsAnalyzing(false);
+    }
+  };
+
+  const saveToRecords = async (predictionData, diag) => {
+    try {
+      await fetch("http://localhost:5001/api/records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientName,
+          patientAge,
+          patientGender,
+          diseaseType: "SkinCancer",
+          result: diag,
+          confidence: (predictionData.confidence * 100).toFixed(2),
+          gradcam: predictionData.gradcam,
+          advancedReport: predictionData.advanced_report,
+          date: new Date().toISOString()
+        })
+      });
+    } catch (error) {
+      console.error("Error saving record:", error);
     }
   };
 
@@ -136,7 +184,7 @@ export default function SkinCancer() {
         <div className="absolute bottom-[-10%] left-[-5%] w-[500px] h-[500px] bg-pink-50/50 rounded-full blur-[120px]"></div>
       </div>
 
-      <div className="max-w-7xl mx-auto">
+      <div className="w-full max-w-[1900px] mx-auto px-6 lg:px-12">
 
         {/* --- HEADER SECTION --- */}
         <motion.div
@@ -152,6 +200,32 @@ export default function SkinCancer() {
               Skin Lesion <span className="text-rose-600">Analysis</span>
             </h1>
             <p className="text-slate-500 mt-3 text-lg font-medium">Upload a clear dermoscopy image for AI-powered risk assessment.</p>
+          </div>
+
+          <div className="bg-white p-3 rounded-2xl shadow-xl border border-rose-50 flex items-center gap-3">
+             <input 
+                type="text" 
+                placeholder="Patient Name" 
+                value={patientName}
+                onChange={(e) => setPatientName(e.target.value)}
+                className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-rose-500 outline-none w-48 font-bold"
+              />
+              <input 
+                type="number" 
+                placeholder="Age" 
+                value={patientAge}
+                onChange={(e) => setPatientAge(e.target.value)}
+                className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-rose-500 outline-none w-20 font-bold"
+              />
+              <select
+                value={patientGender}
+                onChange={(e) => setPatientGender(e.target.value)}
+                className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-rose-500 outline-none font-bold"
+              >
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
           </div>
 
           {/* Status Indicators */}
@@ -316,7 +390,7 @@ export default function SkinCancer() {
                     <div className="flex justify-between items-start mb-6">
                       <div>
                         <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">CNN Prediction</p>
-                        <h2 className={`text-2xl font-black leading-tight ${result.severity === "High Risk" ? "text-red-600" :
+                        <h2 className={`text-2xl font-black leading-tight mb-4 ${result.severity === "High Risk" ? "text-red-600" :
                           result.severity === "Medium Risk" ? "text-orange-600" :
                             result.severity === "Pre-cancer" ? "text-amber-600" :
                               result.severity === "Low Risk" ? "text-yellow-600" :
@@ -324,6 +398,10 @@ export default function SkinCancer() {
                           }`}>
                           {result.diagnosis}
                         </h2>
+                        <VoiceAssistant 
+                          message={["High Risk", "Medium Risk", "Pre-cancer", "Low Risk"].includes(result.severity) ? "Skin disease detect hui hai. Kripya apne skin doctor ya Dermatologist se check karwain." : "Aapki skin completely healthy lag rahi hai."} 
+                          startSpeaking={true} 
+                        />
                       </div>
                       <div className={`p-4 rounded-2xl shrink-0 ${result.severity === "High Risk" ? "bg-red-50 text-red-600" :
                         result.severity === "Medium Risk" ? "bg-orange-50 text-orange-500" :
@@ -385,6 +463,35 @@ export default function SkinCancer() {
                           className="w-full rounded-xl object-cover border border-slate-200" 
                         />
                       </div>
+                    )}
+
+                    {result && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-12 space-y-12 border-t border-slate-100 pt-12"
+                      >
+                        {/* 1st Row: Full Width Clinical Report */}
+                        <div className="w-full">
+                          <AdvancedReport 
+                            data={result.advanced_report} 
+                            diseaseType="SkinCancer" 
+                            confidence={result.confidence}
+                            gradcam={result.gradcam}
+                            patientInfo={{ name: patientName, age: patientAge, gender: patientGender }}
+                          />
+                        </div>
+
+                        {/* 2nd Row: Full Width Doctor Suggestion */}
+                        <div className="w-full">
+                          <DoctorSuggestion diseaseType="SkinCancer" />
+                        </div>
+
+                        {/* 3rd Row: MASSIVE Full Width Horizontal Map */}
+                        <div id="hospital-map" className="w-full rounded-[3rem] overflow-hidden shadow-3xl border border-slate-100 h-[600px]">
+                           <HospitalMap diseaseType="SkinCancer" />
+                        </div>
+                      </motion.div>
                     )}
 
                     <button className="w-full mt-6 py-4 rounded-xl font-bold text-sm bg-slate-900 text-white hover:bg-rose-600 transition-colors flex items-center justify-center gap-2 group">

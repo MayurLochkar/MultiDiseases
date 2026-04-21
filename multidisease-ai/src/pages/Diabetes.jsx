@@ -9,6 +9,11 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+import VoiceAssistant from "../components/VoiceAssistant";
+import DoctorSuggestion from "../components/DoctorSuggestion";
+import HospitalMap from "../components/HospitalMap";
+import AdvancedReport from "../components/AdvancedReport";
+
 export default function Diabetes() {
   const [form, setForm] = useState({
     Pregnancies: "",
@@ -21,6 +26,9 @@ export default function Diabetes() {
     Age: "",
   });
 
+  const [patientName, setPatientName] = useState("");
+  const [patientAge, setPatientAge] = useState("");
+  const [patientGender, setPatientGender] = useState("Male");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -42,10 +50,42 @@ export default function Diabetes() {
 
       const data = await res.json();
       setResult(data);
+
+      // Sync with Chatbot
+      localStorage.setItem('latest_diagnosis', JSON.stringify({
+        disease: "Diabetes",
+        result: data.prediction,
+        confidence: data.prediction.includes("Negative") ? "Low" : "Significant"
+      }));
+
+      if (patientName) {
+        saveToRecords(data);
+      }
     } catch (error) {
       console.error("Error fetching prediction:", error);
     }
     setLoading(false);
+  };
+
+  const saveToRecords = async (predictionData) => {
+    try {
+      await fetch("http://localhost:5001/api/records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientName,
+          patientAge,
+          patientGender,
+          diseaseType: "Diabetes",
+          result: predictionData.prediction,
+          confidence: predictionData.prediction.includes("Negative") ? "Low" : "Significant",
+          advancedReport: predictionData.advanced_report,
+          date: new Date().toISOString()
+        })
+      });
+    } catch (error) {
+      console.error("Error saving record:", error);
+    }
   };
 
   // Graph ke liye data prepare kar rahe hain
@@ -61,8 +101,8 @@ export default function Diabetes() {
   const riskScore = isHighRisk ? 80 : result ? 15 : 0;
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 md:p-10 font-sans text-slate-800">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-[#FDFEFF] text-slate-800 font-sans pt-32 pb-16 px-6 overflow-hidden">
+      <div className="w-full max-w-[1900px] mx-auto px-6 lg:px-12">
 
         {/* Header */}
         <header className="mb-10 text-center md:text-left">
@@ -76,7 +116,34 @@ export default function Diabetes() {
 
           {/* LEFT COLUMN - FORM */}
           <div className="lg:col-span-5 bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-8 border border-slate-100">
-            <h2 className="text-2xl font-bold mb-6 text-slate-800">Patient Metrics</h2>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+              <h2 className="text-2xl font-bold text-slate-800">Patient Metrics</h2>
+              <div className="flex items-center gap-2">
+                <input 
+                  type="text" 
+                  placeholder="Patient Name" 
+                  value={patientName}
+                  onChange={(e) => setPatientName(e.target.value)}
+                  className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-cyan-500 outline-none w-32 font-bold"
+                />
+                <input 
+                  type="number" 
+                  placeholder="Age" 
+                  value={patientAge}
+                  onChange={(e) => setPatientAge(e.target.value)}
+                  className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-cyan-500 outline-none w-16 font-bold"
+                />
+                <select
+                  value={patientGender}
+                  onChange={(e) => setPatientGender(e.target.value)}
+                  className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-cyan-500 outline-none font-bold"
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-5">
               <div className="flex flex-col">
@@ -155,8 +222,14 @@ export default function Diabetes() {
 
                 {/* Risk Meter */}
                 <div className="mb-6">
-                  <div className="flex justify-between items-end mb-2">
-                    <h3 className="text-xl font-bold text-slate-800">Prediction Result</h3>
+                  <div className="flex justify-between items-start mb-4 border-b pb-4 border-slate-200/50">
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-800 mb-2">Prediction Result</h3>
+                      <VoiceAssistant 
+                        message={isHighRisk ? "Diabetes detect hui hai. Kripya Endocrinologist se salaah lein." : "Koi significant diabetes risk nahi hai."} 
+                        startSpeaking={true} 
+                      />
+                    </div>
                     <span className={`text-lg font-bold ${isHighRisk ? 'text-orange-600' : 'text-blue-600'}`}>
                       {result.prediction}
                     </span>
@@ -204,6 +277,33 @@ export default function Diabetes() {
                     </div>
                   )}
                 </div>
+
+                {result && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-12 space-y-12 border-t border-slate-100 pt-12"
+                  >
+                    {/* 1st Row: Full Width Clinical Report */}
+                    <div className="w-full">
+                      <AdvancedReport 
+                        data={result.advanced_report} 
+                        diseaseType="Diabetes" 
+                        patientInfo={{ name: patientName, age: patientAge, gender: patientGender }}
+                      />
+                    </div>
+
+                    {/* 2nd Row: Full Width Doctor Suggestion */}
+                    <div className="w-full">
+                      <DoctorSuggestion diseaseType="Diabetes" />
+                    </div>
+
+                    {/* 3rd Row: MASSIVE Full Width Horizontal Map */}
+                    <div id="hospital-map" className="w-full border border-slate-100 rounded-[3rem] overflow-hidden shadow-3xl h-[600px]">
+                      <HospitalMap diseaseType="Diabetes" />
+                    </div>
+                  </motion.div>
+                )}
 
               </div>
             )}

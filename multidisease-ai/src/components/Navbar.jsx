@@ -28,6 +28,7 @@ export default function Navbar() {
     { name: "Skin Cancer", path: "/skincancer" },
     { name: "Heart", path: "/heart" },
     { name: "Diabetes", path: "/diabetes" },
+    { name: "Records", path: "/records" },
   ];
 
   return (
