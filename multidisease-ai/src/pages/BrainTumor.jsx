@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  FaBrain, FaCloudUploadAlt, FaMicroscope, FaCheckCircle, 
+import {
+  FaBrain, FaCloudUploadAlt, FaMicroscope, FaCheckCircle,
   FaExclamationTriangle, FaFileMedicalAlt, FaArrowRight, FaDna, FaUser
 } from "react-icons/fa";
 import { BiScan, BiPulse, BiLoaderAlt } from "react-icons/bi";
@@ -10,6 +10,7 @@ import DoctorSuggestion from "../components/DoctorSuggestion";
 import HospitalMap from "../components/HospitalMap";
 import AdvancedReport from "../components/AdvancedReport";
 import EmergencyAlert from "../components/EmergencyAlert";
+import AppointmentBooking from "../components/AppointmentBooking";
 
 // --- ANIMATION VARIANTS ---
 const containerVar = {
@@ -35,6 +36,8 @@ export default function BrainTumor() {
   const [result, setResult] = useState(null);
   const [logs, setLogs] = useState([]);
   const [showEmergency, setShowEmergency] = useState(false);
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [selectedHospital, setSelectedHospital] = useState(null);
   const logsEndRef = useRef(null);
 
   // Auto-scroll logs
@@ -59,110 +62,110 @@ export default function BrainTumor() {
 
   const runAnalysis = async () => {
 
-  if (!image) return;
+    if (!image) return;
 
-  setIsAnalyzing(true);
-  setLogs([]);
-  addLog("Uploading MRI image to AI server...", "info");
+    setIsAnalyzing(true);
+    setLogs([]);
+    addLog("Uploading MRI image to AI server...", "info");
 
-  const formData = new FormData();
-  formData.append("file", image);
+    const formData = new FormData();
+    formData.append("file", image);
 
-  try {
+    try {
 
-    const res = await fetch("http://localhost:5001/api/brain", {
-      method: "POST",
-      body: formData
-    });
+      const res = await fetch("http://localhost:5001/api/brain", {
+        method: "POST",
+        body: formData
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    addLog("Model inference complete.", "success");
+      addLog("Model inference complete.", "success");
 
-    const diagResult = data.prediction === "TUMOR" ? "Brain Tumor Detected" : "No Tumor Detected";
-    const confVal = (data.confidence * 100).toFixed(2);
+      const diagResult = data.prediction === "TUMOR" ? "Brain Tumor Detected" : "No Tumor Detected";
+      const confVal = ((data.confidence || 0) * 100).toFixed(2);
 
-    setResult({
-      diagnosis: diagResult,
-      confidence: confVal,
-      severity: data.prediction === "TUMOR" ? "High Risk" : "Normal",
-      desc: "Prediction generated using trained CNN model.",
-      gradcam: data.gradcam,
-      advanced_report: data.advanced_report
-    });
+      setResult({
+        diagnosis: diagResult,
+        confidence: confVal,
+        severity: data.prediction === "TUMOR" ? "High Risk" : "Normal",
+        desc: "Prediction generated using trained CNN model.",
+        gradcam: data.gradcam,
+        advanced_report: data.advanced_report
+      });
 
-    // Sync with Chatbot
-    localStorage.setItem('latest_diagnosis', JSON.stringify({
-      disease: "Brain Tumor",
-      result: diagResult,
-      confidence: confVal
-    }));
+      // Sync with Chatbot
+      localStorage.setItem('latest_diagnosis', JSON.stringify({
+        disease: "Brain Tumor",
+        result: diagResult,
+        confidence: confVal
+      }));
 
-    if (data.prediction === "TUMOR") {
-      setShowEmergency(true);
+      if (data.prediction === "TUMOR") {
+        setShowEmergency(true);
+      }
+
+      if (patientName) {
+        saveToRecords(data);
+      }
+
+    } catch (err) {
+      console.log(err);
+      addLog("Server connection failed.", "warning");
     }
 
-    if (patientName) {
-      saveToRecords(data);
+    setIsAnalyzing(false);
+  };
+
+  const saveToRecords = async (predictionData) => {
+    try {
+      await fetch("http://localhost:5001/api/records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientName,
+          patientAge,
+          patientGender,
+          diseaseType: "BrainTumor",
+          result: predictionData.prediction,
+          confidence: (predictionData.confidence * 100).toFixed(2),
+          gradcam: predictionData.gradcam,
+          advancedReport: predictionData.advanced_report,
+          date: new Date().toISOString()
+        })
+      });
+    } catch (error) {
+      console.error("Error saving record:", error);
     }
-
-  } catch (err) {
-    console.log(err);
-    addLog("Server connection failed.", "warning");
-  }
-
-  setIsAnalyzing(false);
-};
-
-const saveToRecords = async (predictionData) => {
-  try {
-    await fetch("http://localhost:5001/api/records", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        patientName,
-        patientAge,
-        patientGender,
-        diseaseType: "BrainTumor",
-        result: predictionData.prediction,
-        confidence: (predictionData.confidence * 100).toFixed(2),
-        gradcam: predictionData.gradcam,
-        advancedReport: predictionData.advanced_report,
-        date: new Date().toISOString()
-      })
-    });
-  } catch (error) {
-    console.error("Error saving record:", error);
-  }
-};
+  };
 
   return (
     <div className="min-h-screen bg-[#FDFEFF] text-slate-800 font-sans pt-32 pb-10 px-6 overflow-hidden">
-      <EmergencyAlert 
-        isOpen={showEmergency} 
-        onClose={() => setShowEmergency(false)} 
+      <EmergencyAlert
+        isOpen={showEmergency}
+        onClose={() => setShowEmergency(false)}
         diseaseType="BrainTumor"
         severity={result?.severity || "High Risk"}
       />
-      
+
       {/* Background Animated Gradient Blobs */}
       <div className="fixed inset-0 pointer-events-none -z-10">
-        <motion.div 
+        <motion.div
           animate={{ x: [0, 100, 0], y: [0, 50, 0] }}
           transition={{ duration: 10, repeat: Infinity }}
-          className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-100/50 rounded-full blur-[100px]" 
+          className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-100/50 rounded-full blur-[100px]"
         />
-        <motion.div 
+        <motion.div
           animate={{ x: [0, -100, 0], y: [0, -50, 0] }}
           transition={{ duration: 15, repeat: Infinity }}
-          className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-teal-50/50 rounded-full blur-[100px]" 
+          className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-teal-50/50 rounded-full blur-[100px]"
         />
       </div>
 
       <div className="w-full max-w-[1900px] mx-auto px-6 lg:px-12">
-        
+
         {/* --- HEADER --- */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
           className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6"
         >
@@ -177,54 +180,54 @@ const saveToRecords = async (predictionData) => {
             <p className="text-slate-500 mt-2 text-lg font-medium">Advanced MRI Segmentation & Classification.</p>
           </div>
           <div className="bg-white p-3 rounded-2xl shadow-xl border border-blue-50 flex items-center gap-3">
-             <input 
-                type="text" 
-                placeholder="Patient Name" 
-                value={patientName}
-                onChange={(e) => setPatientName(e.target.value)}
-                className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none w-48 font-bold"
-              />
-              <input 
-                type="number" 
-                placeholder="Age" 
-                value={patientAge}
-                onChange={(e) => setPatientAge(e.target.value)}
-                className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none w-20 font-bold"
-              />
-              <select
-                value={patientGender}
-                onChange={(e) => setPatientGender(e.target.value)}
-                className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold"
-              >
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-              </select>
+            <input
+              type="text"
+              placeholder="Patient Name"
+              value={patientName}
+              onChange={(e) => setPatientName(e.target.value)}
+              className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none w-48 font-bold"
+            />
+            <input
+              type="number"
+              placeholder="Age"
+              value={patientAge}
+              onChange={(e) => setPatientAge(e.target.value)}
+              className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none w-20 font-bold"
+            />
+            <select
+              value={patientGender}
+              onChange={(e) => setPatientGender(e.target.value)}
+              className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+            >
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
           </div>
         </motion.div>
 
         <div className="grid lg:grid-cols-12 gap-8 items-start">
-          
+
           {/* --- LEFT: INTERACTIVE SCANNER (7 Cols) --- */}
           <div className="lg:col-span-7 space-y-6">
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
               className="bg-white rounded-[2.5rem] shadow-2xl shadow-blue-900/5 border border-white relative overflow-hidden group"
             >
-              
+
               {!preview ? (
                 <label className="cursor-pointer flex flex-col items-center justify-center gap-6 p-20 transition-all duration-300 hover:bg-blue-50/30">
                   <input type="file" className="hidden" onChange={handleImageChange} accept="image/*" />
-                  
+
                   {/* Bouncing Icon on Hover */}
-                  <motion.div 
+                  <motion.div
                     whileHover={{ scale: 1.1, rotate: 10 }}
                     whileTap={{ scale: 0.9 }}
                     className="w-28 h-28 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-[2rem] flex items-center justify-center text-5xl shadow-lg shadow-blue-200"
                   >
                     <FaCloudUploadAlt />
                   </motion.div>
-                  
+
                   <div className="text-center space-y-2">
                     <h3 className="text-2xl font-bold text-slate-800">Upload MRI Scan</h3>
                     <p className="text-slate-400 font-medium">Supports DICOM, PNG, JPG</p>
@@ -233,25 +236,25 @@ const saveToRecords = async (predictionData) => {
               ) : (
                 <div className="relative w-full bg-slate-900 flex items-center justify-center overflow-hidden min-h-[500px]">
                   <img src={preview} alt="MRI" className="max-h-[450px] w-auto object-contain opacity-90" />
-                  
-                  {/* High-Tech Scanning Beam */}
+
+                  {/* High-Speed Scanning Beam */}
                   <AnimatePresence>
                     {isAnalyzing && (
-                      <motion.div 
+                      <motion.div
                         initial={{ top: "-10%" }}
                         animate={{ top: "110%" }}
-                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                        className="absolute left-0 right-0 h-2 bg-blue-400 shadow-[0_0_40px_rgba(59,130,246,0.8)] z-10 blur-[1px]"
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="absolute left-0 right-0 h-4 bg-blue-400 shadow-[0_0_50px_rgba(59,130,246,1)] z-10 blur-[2px]"
                       />
                     )}
                   </AnimatePresence>
 
                   {/* Grid Overlay */}
                   <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:50px_50px] pointer-events-none"></div>
-                  
-                  <motion.button 
+
+                  <motion.button
                     whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                    onClick={() => {setPreview(null); setResult(null); setLogs([]);}}
+                    onClick={() => { setPreview(null); setResult(null); setLogs([]); }}
                     className="absolute top-6 right-6 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white px-5 py-2.5 rounded-xl text-xs font-bold border border-white/10 transition-all"
                   >
                     Reset Image
@@ -261,18 +264,17 @@ const saveToRecords = async (predictionData) => {
             </motion.div>
 
             {/* Run Button with Glow Effect */}
-            <motion.button 
+            <motion.button
               whileHover={{ scale: 1.02, boxShadow: "0px 20px 40px -10px rgba(37, 99, 235, 0.3)" }}
               whileTap={{ scale: 0.98 }}
               onClick={runAnalysis}
               disabled={!image || isAnalyzing}
-              className={`w-full py-5 rounded-[1.5rem] font-black text-lg flex items-center justify-center gap-3 transition-all border ${
-                !image 
-                  ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed" 
-                  : isAnalyzing 
+              className={`w-full py-5 rounded-[1.5rem] font-black text-lg flex items-center justify-center gap-3 transition-all border ${!image
+                  ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                  : isAnalyzing
                     ? "bg-indigo-50 text-indigo-600 border-indigo-100 cursor-wait"
                     : "bg-blue-600 text-white border-blue-500 shadow-xl shadow-blue-200"
-              }`}
+                }`}
             >
               {isAnalyzing ? (
                 <><BiLoaderAlt className="animate-spin text-xl" /> Processing Neural Layers...</>
@@ -284,16 +286,16 @@ const saveToRecords = async (predictionData) => {
 
           {/* --- RIGHT: LIVE DATA & REPORT (5 Cols) --- */}
           <div className="lg:col-span-5 space-y-6">
-            
+
             {/* Live Logs Card */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}
               className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-lg shadow-slate-100 h-80 flex flex-col"
             >
               <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2 border-b border-slate-50 pb-3">
                 <BiPulse className="text-blue-500 text-lg" /> System Activity Log
               </h3>
-              
+
               <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
                 <AnimatePresence>
                   {logs.length === 0 && (
@@ -302,8 +304,8 @@ const saveToRecords = async (predictionData) => {
                     </motion.p>
                   )}
                   {logs.map((log) => (
-                    <motion.div 
-                      key={log.id} 
+                    <motion.div
+                      key={log.id}
                       variants={itemVar} initial="hidden" animate="show" exit={{ opacity: 0 }}
                       className="flex gap-3 items-start"
                     >
@@ -321,22 +323,28 @@ const saveToRecords = async (predictionData) => {
             {/* Result Report Card (Morphing) */}
             <AnimatePresence mode="wait">
               {result && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 30, scale: 0.9 }} 
-                  animate={{ opacity: 1, y: 0, scale: 1 }} 
+                <motion.div
+                  initial={{ opacity: 0, y: 30, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ type: "spring", stiffness: 200, damping: 20 }}
                   className="bg-white rounded-[2rem] border border-blue-100 shadow-2xl shadow-blue-100 overflow-hidden relative"
                 >
                   {/* Decorative Header BG */}
                   <div className={`h-2 w-full absolute top-0 ${result.severity.includes("High") ? "bg-red-500" : "bg-green-500"}`}></div>
-                  
+
                   <div className="p-8">
                     <div className="flex justify-between items-start mb-6">
                       <div>
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Final Diagnosis</p>
                         <h2 className="text-3xl font-black text-slate-800 leading-tight">{result.diagnosis}</h2>
+                        <div className="mt-2 text-xs flex items-center gap-2">
+                          <VoiceAssistant 
+                            message={result.diagnosis.includes("Detected") ? `Analysis indicates a potential brain tumor. Please consult a neurology specialist immediately for a clinical review.` : "The MRI scan analysis did not detect any brain tumor. Your scan appears normal."} 
+                            startSpeaking={true} 
+                          />
+                        </div>
                       </div>
-                      <motion.div 
+                      <motion.div
                         initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.3 }}
                         className={`p-3 rounded-2xl ${result.severity.includes("High") ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"}`}
                       >
@@ -370,30 +378,30 @@ const saveToRecords = async (predictionData) => {
                           <BiScan className="text-blue-500" />
                           AI Heatmap (Grad-CAM)
                         </p>
-                        <img 
-                          src={`http://127.0.0.1:8000${result.gradcam}?t=${new Date().getTime()}`} 
-                          alt="Grad-CAM Focus" 
-                          className="w-full rounded-xl object-cover border border-slate-200" 
+                        <img
+                          src={`http://127.0.0.1:8000${result.gradcam}?t=${new Date().getTime()}`}
+                          alt="Grad-CAM Focus"
+                          className="w-full rounded-xl object-cover border border-slate-200"
                         />
                       </div>
                     )}
 
                     <button className="w-full py-4 rounded-xl font-bold text-sm bg-slate-900 text-white hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 group">
-                      Download Full Report 
+                      Download Full Report
                       <FaArrowRight className="group-hover:translate-x-1 transition-transform" />
                     </button>
 
                     {result && (
-                      <motion.div 
+                      <motion.div
                         initial={{ opacity: 0, y: 30 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="mt-12 space-y-12 border-t border-slate-100 pt-12"
                       >
                         {/* 1st Row: Full Width Clinical Report */}
                         <div className="w-full">
-                          <AdvancedReport 
-                            data={result.advanced_report} 
-                            diseaseType="BrainTumor" 
+                          <AdvancedReport
+                            data={result.advanced_report}
+                            diseaseType="BrainTumor"
                             confidence={result.confidence}
                             gradcam={result.gradcam}
                             patientInfo={{ name: patientName, age: patientAge, gender: patientGender }}
@@ -402,12 +410,19 @@ const saveToRecords = async (predictionData) => {
 
                         {/* 2nd Row: Full Width Doctor Suggestion */}
                         <div className="w-full">
-                          <DoctorSuggestion diseaseType="BrainTumor" />
+                          <DoctorSuggestion
+                            diseaseType="BrainTumor"
+                            hospital={selectedHospital}
+                            onBook={() => setIsBookingOpen(true)}
+                          />
                         </div>
 
                         {/* 3rd Row: MASSIVE Full Width Horizontal Map */}
                         <div id="hospital-map" className="w-full rounded-[3rem] overflow-hidden shadow-3xl border border-slate-100 h-[600px]">
-                           <HospitalMap diseaseType="BrainTumor" />
+                          <HospitalMap
+                            diseaseType="BrainTumor"
+                            onHospitalSelect={setSelectedHospital}
+                          />
                         </div>
                       </motion.div>
                     )}
@@ -417,15 +432,23 @@ const saveToRecords = async (predictionData) => {
             </AnimatePresence>
           </div>
         </div>
-      </div>
+        <AppointmentBooking
+          isOpen={isBookingOpen}
+          onClose={() => setIsBookingOpen(false)}
+          hospital={selectedHospital}
+          specialistType="Neurologist"
+          patientInfo={{ name: patientName, age: patientAge, gender: patientGender }}
+        />
 
-      {/* --- SCROLLBAR STYLES --- */}
-      <style dangerouslySetInnerHTML={{ __html: `
+        {/* --- SCROLLBAR STYLES --- */}
+        <style dangerouslySetInnerHTML={{
+          __html: `
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
       `}} />
+      </div>
     </div>
   );
 }

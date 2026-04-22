@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import {
   BarChart,
   Bar,
@@ -14,9 +15,9 @@ import DoctorSuggestion from "../components/DoctorSuggestion";
 import HospitalMap from "../components/HospitalMap";
 import AdvancedReport from "../components/AdvancedReport";
 import EmergencyAlert from "../components/EmergencyAlert";
+import AppointmentBooking from "../components/AppointmentBooking";
 
 export default function Heart() {
-  // Ab poore 13 parameters add kar diye hain as per your screenshot
   const [form, setForm] = useState({
     age: "",
     sex: "",
@@ -39,6 +40,8 @@ export default function Heart() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showEmergency, setShowEmergency] = useState(false);
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [selectedHospital, setSelectedHospital] = useState(null);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: Number(e.target.value) });
@@ -117,6 +120,13 @@ export default function Heart() {
         onClose={() => setShowEmergency(false)} 
         diseaseType="Heart"
         severity={result?.prediction || "High Risk"}
+      />
+      <AppointmentBooking 
+        isOpen={isBookingOpen}
+        onClose={() => setIsBookingOpen(false)}
+        hospital={selectedHospital}
+        specialistType="Cardiologist"
+        patientInfo={{ name: patientName, age: patientAge, gender: patientGender }}
       />
       <div className="space-y-6">
 
@@ -286,7 +296,7 @@ export default function Heart() {
                     <div>
                       <h3 className="text-xl font-extrabold text-slate-800 mb-2">AI Assessment</h3>
                       <VoiceAssistant 
-                        message={isHighRisk ? "Heart risk detect hua hai. Kripya kisi Cardiology specialist ko zaroor dikhayein." : "Aapki heart health completely stable hai."} 
+                        message={isHighRisk ? "Heart health risk detected. Please consult a cardiology specialist for a comprehensive checkup." : "Your heart vitals appear stable and healthy."} 
                         startSpeaking={true} 
                       />
                     </div>
@@ -351,12 +361,19 @@ export default function Heart() {
 
                     {/* 2nd Row: Full Width Doctor Suggestion */}
                     <div className="w-full">
-                      <DoctorSuggestion diseaseType="Heart" />
+                      <DoctorSuggestion 
+                        diseaseType="Heart" 
+                        hospital={selectedHospital}
+                        onBook={() => setIsBookingOpen(true)}
+                      />
                     </div>
 
                     {/* 3rd Row: MASSIVE Full Width Horizontal Map */}
                     <div id="hospital-map" className="w-full rounded-[3rem] overflow-hidden shadow-3xl border border-slate-100 h-[600px]">
-                      <HospitalMap diseaseType="Heart" />
+                      <HospitalMap 
+                        diseaseType="Heart" 
+                        onHospitalSelect={setSelectedHospital}
+                      />
                     </div>
                   </motion.div>
                 )}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import {
   BarChart,
   Bar,
@@ -13,6 +14,7 @@ import VoiceAssistant from "../components/VoiceAssistant";
 import DoctorSuggestion from "../components/DoctorSuggestion";
 import HospitalMap from "../components/HospitalMap";
 import AdvancedReport from "../components/AdvancedReport";
+import AppointmentBooking from "../components/AppointmentBooking";
 
 export default function Diabetes() {
   const [form, setForm] = useState({
@@ -31,6 +33,8 @@ export default function Diabetes() {
   const [patientGender, setPatientGender] = useState("Male");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [selectedHospital, setSelectedHospital] = useState(null);
 
   // ✅ TUMHARI ORIGINAL LOGIC (No changes)
   const handleChange = (e) => {
@@ -55,7 +59,7 @@ export default function Diabetes() {
       localStorage.setItem('latest_diagnosis', JSON.stringify({
         disease: "Diabetes",
         result: data.prediction,
-        confidence: data.prediction.includes("Negative") ? "Low" : "Significant"
+        confidence: data.prediction.toLowerCase().includes("normal") ? "Low" : "Significant"
       }));
 
       if (patientName) {
@@ -226,7 +230,7 @@ export default function Diabetes() {
                     <div>
                       <h3 className="text-xl font-bold text-slate-800 mb-2">Prediction Result</h3>
                       <VoiceAssistant 
-                        message={isHighRisk ? "Diabetes detect hui hai. Kripya Endocrinologist se salaah lein." : "Koi significant diabetes risk nahi hai."} 
+                        message={isHighRisk ? "Diabetes risk indicators detected. Please consult an endocrinologist for further testing." : "No significant diabetes risk detected. Your levels appear healthy."} 
                         startSpeaking={true} 
                       />
                     </div>
@@ -295,18 +299,33 @@ export default function Diabetes() {
 
                     {/* 2nd Row: Full Width Doctor Suggestion */}
                     <div className="w-full">
-                      <DoctorSuggestion diseaseType="Diabetes" />
+                      <DoctorSuggestion 
+                        diseaseType="Diabetes" 
+                        hospital={selectedHospital}
+                        onBook={() => setIsBookingOpen(true)}
+                      />
                     </div>
 
                     {/* 3rd Row: MASSIVE Full Width Horizontal Map */}
                     <div id="hospital-map" className="w-full border border-slate-100 rounded-[3rem] overflow-hidden shadow-3xl h-[600px]">
-                      <HospitalMap diseaseType="Diabetes" />
+                      <HospitalMap 
+                        diseaseType="Diabetes" 
+                        onHospitalSelect={setSelectedHospital}
+                      />
                     </div>
                   </motion.div>
                 )}
 
               </div>
             )}
+
+            <AppointmentBooking 
+                isOpen={isBookingOpen}
+                onClose={() => setIsBookingOpen(false)}
+                hospital={selectedHospital}
+                specialistType="Endocrinologist"
+                patientInfo={{ name: patientName, age: patientAge, gender: patientGender }}
+            />
 
           </div>
         </div>

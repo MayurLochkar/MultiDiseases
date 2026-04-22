@@ -1,5 +1,52 @@
 [
   {
+    "id": 1776851487182,
+    "patientName": "rr",
+    "patientAge": "15",
+    "patientGender": "Male",
+    "diseaseType": "BrainTumor",
+    "result": "TUMOR",
+    "advancedReport": {
+      "localization": "Left Hemisphere, Occipital Lobe",
+      "severity": "Critical",
+      "tumor_size_est": "63 mm",
+      "findings": [
+        "Mass effect detected",
+        "Midline shift risk"
+      ],
+      "complications": [
+        "Cerebral edema",
+        "Increased ICP"
+      ],
+      "type_estimate": "Malignant Glioma"
+    },
+    "date": "2026-04-22T09:51:27.170Z"
+  },
+  {
+    "id": 1776836176895,
+    "patientName": "Rahi",
+    "patientAge": "18",
+    "patientGender": "Female",
+    "diseaseType": "Pneumonia",
+    "result": "PNEUMONIA",
+    "advancedReport": {
+      "type": "Lobar Pneumonia",
+      "localization": "Right Upper Lobe",
+      "severity": "Severe",
+      "infected_area": "0%",
+      "findings": [
+        "Focal consolidation found",
+        "Dense opacification",
+        "Pleural effusion risk: High"
+      ],
+      "complications": [
+        "Respiratory Failure risk"
+      ],
+      "cause": "Bacterial (S. pneumoniae)"
+    },
+    "date": "2026-04-22T05:36:16.795Z"
+  },
+  {
     "id": 1776710576418,
     "patientName": "Roshni",
     "patientAge": "18",

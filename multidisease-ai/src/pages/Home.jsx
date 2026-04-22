@@ -91,7 +91,7 @@ export default function Home() {
   return (
     <div className="min-h-screen text-slate-900 font-sans selection:bg-blue-600/10 selection:text-blue-700 overflow-x-hidden">
       
-      <SpotlightBackground />
+      < SpotlightBackground />
       
       {/* --- SCROLL PROGRESS BAR --- */}
       <motion.div className="fixed top-0 left-0 right-0 h-1 bg-blue-600 origin-left z-[120]" style={{ scaleX }} />

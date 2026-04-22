@@ -8,14 +8,14 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const sleep = (ms) => new Promise(res => setTimeout(res, ms));
 
 async function callGemini(model, contents, retryCount = 0) {
-  const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
   
   try {
     const response = await axios.post(url, {
       contents,
       generationConfig: { 
         temperature: 0.7, 
-        maxOutputTokens: 1000 // Increased for detailed solutions
+        maxOutputTokens: 1000 
       }
     }, { 
       headers: { "Content-Type": "application/json" },
@@ -25,16 +25,23 @@ async function callGemini(model, contents, retryCount = 0) {
     return response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
   } catch (err) {
     const status = err.response?.status;
+    const msg = err.response?.data?.error?.message || err.message;
     
     // Auto-retry once on 429
     if (status === 429 && retryCount < 1) {
-      console.warn(`[Chat] ⏳ Rate limited on ${model}. Retrying in 3s...`);
-      await sleep(3000);
+      console.warn(`[Chat] ⏳ Rate limited on ${model}. Retrying in 1.2s...`);
+      await sleep(1200);
       return callGemini(model, contents, retryCount + 1);
     }
+    
+    console.error(`[Chat] ❌ Model ${model} failed: ${msg}`);
     throw err;
   }
 }
+
+// ── Smart Model Health Tracker ──
+const modelHealth = {};
+const COOLDOWN_MS = 60000; // Increase to 1 minute
 
 router.post("/", async (req, res) => {
   const { messages, systemPrompt } = req.body;
@@ -43,46 +50,61 @@ router.post("/", async (req, res) => {
     return res.status(500).json({ error: "Gemini API Key missing in server/.env" });
   }
 
-  // Use the models confirmed available for your key
-  const modelsToTry = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.0-flash-lite"];
+  // Refined model list for ultra-fast response (v1 stable)
+  // Verified models for this API key (Gwalior Region / Latest Tier)
+  const modelsToTry = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-flash-latest"
+  ];
+  
   let lastError = null;
+  const now = Date.now();
 
-  // Prepare contents for Gemini
+  const prunedMessages = messages.slice(-8); // Slightly more context
+
   const contents = [
-    { role: "user", parts: [{ text: `INSTRUCTIONS: ${systemPrompt}` }] },
-    { role: "model", parts: [{ text: "I understand. I will provide specific medical solutions based on the diagnosis and context provided." }] }
+    { role: "user", parts: [{ text: `SYSTEM INSTRUCTIONS: ${systemPrompt}\n\nUser has initiated a session. Please acknowledge the patient context and provide help accordingly.` }] }
   ];
 
-  messages.forEach(m => {
+  prunedMessages.forEach(m => {
     contents.push({
       role: m.role === "assistant" ? "model" : "user",
       parts: [{ text: m.content }]
     });
   });
 
+  // 3. Execution with Smart Rotation
   for (const model of modelsToTry) {
+    // Skip if in cooldown
+    if (modelHealth[model] && (now - modelHealth[model] < COOLDOWN_MS)) {
+      continue;
+    }
+
     try {
-      console.log(`[Chat] Requesting real AI solution from: ${model}`);
+      console.log(`[Chat] Attempting: ${model}`);
       const reply = await callGemini(model, contents);
       
       if (reply) {
-        console.log(`[Chat] ✅ Success with ${model}`);
         return res.json({ reply });
       }
     } catch (err) {
       const status = err.response?.status;
       lastError = { status, msg: err.response?.data?.error?.message || err.message };
-      console.error(`[Chat] ❌ ${model} failed (${status})`);
       
-      if (status === 401 || status === 403) break; // Key issue
+      if (status === 429 || status === 500 || status === 503) {
+          modelHealth[model] = Date.now();
+      } else if (status === 401 || status === 403) {
+          break; // Stop if API key issues
+      }
     }
   }
 
-  // If all real API calls fail, provide a real error (No dummy fallback as requested)
+  // Final Professional Error Handling
   const isRateLimit = lastError?.status === 429;
   const errorMsg = isRateLimit 
-    ? "The AI is currently at maximum capacity. Please wait 20-30 seconds for a real solution based on your scan."
-    : `AI Error: ${lastError?.msg || "Connection lost"}`;
+    ? "Our clinical AI nodes are high-capacity. Please wait a few seconds."
+    : `Clinical AI Engine: ${lastError?.msg || "Connection disrupted"}. Please try again.`;
 
   return res.status(lastError?.status || 500).json({ error: errorMsg });
 });

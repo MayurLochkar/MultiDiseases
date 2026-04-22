@@ -469,15 +469,18 @@ export default function FloatingChatbot() {
                     >
                       {disease?.emoji || "🤖"}
                     </div>
-                    <div className="bg-slate-100 px-4 py-3 rounded-2xl rounded-bl-md flex gap-1 items-center">
-                      {[0, 0.18, 0.36].map((delay, i) => (
-                        <motion.span
-                          key={i}
-                          className="w-1.5 h-1.5 rounded-full bg-slate-400"
-                          animate={{ y: [0, -4, 0] }}
-                          transition={{ duration: 0.55, repeat: Infinity, delay }}
-                        />
-                      ))}
+                    <div className="bg-slate-100 px-4 py-3 rounded-2xl rounded-bl-md flex flex-col gap-2 shadow-sm border border-slate-200/50">
+                      <div className="flex gap-1 items-center">
+                        {[0, 0.18, 0.36].map((delay, i) => (
+                          <motion.span
+                            key={i}
+                            className="w-1.5 h-1.5 rounded-full bg-blue-500"
+                            animate={{ y: [0, -4, 0] }}
+                            transition={{ duration: 0.55, repeat: Infinity, delay }}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Calibrating Diagnostic Nodes...</p>
                     </div>
                   </motion.div>
                 )}
@@ -543,7 +546,28 @@ export default function FloatingChatbot() {
                     }
                   </button>
                 </div>
-                <p className="text-center text-[10px] text-slate-400 mt-2">
+
+                {/* --- SUGGESTED FOLLOW-UPS --- */}
+                {!loading && messages.length > 1 && messages[messages.length - 1].role === "assistant" && (
+                    <div className="mt-3 flex flex-wrap gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                        {[
+                            "Give me short points",
+                            "What are the next steps?",
+                            "How serious is this?",
+                            "Explain clinical risks"
+                        ].map((suggest, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => sendMessage(suggest)}
+                                className="whitespace-nowrap text-[10px] font-bold px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:border-blue-400 hover:text-blue-600 transition-all active:scale-95 shadow-sm"
+                            >
+                                {suggest}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                <p className="text-center text-[10px] text-slate-400 mt-3">
                   Powered by <span style={{ color: accentColor }} className="font-semibold">Google Gemini</span> · Not a substitute for medical advice
                 </p>
               </div>

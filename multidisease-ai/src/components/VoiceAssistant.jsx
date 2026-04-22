@@ -25,21 +25,29 @@ export default function VoiceAssistant({ message, startSpeaking }) {
         
         const utterance = new SpeechSynthesisUtterance(message);
         
-        // Find a good Indian voice (Prefer Google Hindi, then any hi-IN, then en-IN)
-        const googleHindi = voices.find(v => v.name.includes('Google हिन्दी') || v.name.includes('hi-IN'));
-        const indianEng = voices.find(v => v.lang === 'en-IN');
+        // ✨ High-Quality English Voice Selection
+        // Prioritize premium natural sounding voices if available
+        const premiumEnglish = voices.find(v => 
+          v.name.includes('Google US English') || 
+          v.name.includes('Samantha') || 
+          v.name.includes('Microsoft Zira') ||
+          v.name.includes('English (United States)')
+        );
         
-        if (googleHindi) {
-          utterance.voice = googleHindi;
-          utterance.lang = 'hi-IN';
-        } else if (indianEng) {
-          utterance.voice = indianEng;
-          utterance.lang = 'en-IN';
+        const generalEnglish = voices.find(v => v.lang.startsWith('en'));
+        
+        if (premiumEnglish) {
+          utterance.voice = premiumEnglish;
+          utterance.lang = 'en-US';
+        } else if (generalEnglish) {
+          utterance.voice = generalEnglish;
+          utterance.lang = generalEnglish.lang;
         }
 
-        // Tweak properties for a better and softer voice
-        utterance.rate = 0.95; 
-        utterance.pitch = 1.05; 
+        // 👄 Tone Optimization for a Professional Medical Feel
+        utterance.rate = 0.9;  // Slightly slower for better clarity
+        utterance.pitch = 1.0; // Natural pitch
+        utterance.volume = 1.0;
         
         window.speechSynthesis.speak(utterance);
       }

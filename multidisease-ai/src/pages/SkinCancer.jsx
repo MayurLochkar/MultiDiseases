@@ -10,6 +10,7 @@ import VoiceAssistant from "../components/VoiceAssistant";
 import DoctorSuggestion from "../components/DoctorSuggestion";
 import HospitalMap from "../components/HospitalMap";
 import AdvancedReport from "../components/AdvancedReport";
+import AppointmentBooking from "../components/AppointmentBooking";
 // --- ANIMATION VARIANTS ---
 const itemVar = {
   hidden: { opacity: 0, x: 20 },
@@ -25,6 +26,8 @@ export default function SkinCancer() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
   const [logs, setLogs] = useState([]);
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [selectedHospital, setSelectedHospital] = useState(null);
   const logsEndRef = useRef(null);
 
   // Auto-scroll logs
@@ -120,33 +123,31 @@ export default function SkinCancer() {
 
       const { diagnosis, severity, notes } = mapped;
 
-      setTimeout(() => {
-        addLog("Analysis Complete. Compiling diagnostic report...", "success");
+      addLog("Analysis Complete. Compiling diagnostic report...", "success");
 
-        const confVal = (data.confidence * 100).toFixed(2);
-        
-        setResult({
-          diagnosis,
-          confidence: confVal,
-          severity,
-          notes,
-          gradcam: data.gradcam,
-          advanced_report: data.advanced_report
-        });
+      const confVal = ((data.confidence || 0) * 100).toFixed(2);
+      
+      setResult({
+        diagnosis,
+        confidence: confVal,
+        severity,
+        notes,
+        gradcam: data.gradcam,
+        advanced_report: data.advanced_report
+      });
 
-        // Sync with Chatbot
-        localStorage.setItem('latest_diagnosis', JSON.stringify({
-          disease: "Skin Cancer",
-          result: diagnosis,
-          confidence: confVal
-        }));
+      // Sync with Chatbot
+      localStorage.setItem('latest_diagnosis', JSON.stringify({
+        disease: "Skin Cancer",
+        result: diagnosis,
+        confidence: confVal
+      }));
 
-        if (patientName) {
-          saveToRecords(data, diagnosis);
-        }
+      if (patientName) {
+        saveToRecords(data, diagnosis);
+      }
 
-        setIsAnalyzing(false);
-      }, 4800);
+      setIsAnalyzing(false);
     } catch (error) {
       console.error(error);
       setIsAnalyzing(false);
@@ -275,15 +276,15 @@ export default function SkinCancer() {
                 <div className="relative w-full bg-slate-950 flex items-center justify-center overflow-hidden min-h-[500px]">
                   <img src={preview} alt="Lesion" className="max-h-[500px] w-auto object-contain opacity-80" />
 
-                  {/* Rose Colored Scanning Beam */}
+                  {/* Rose Colored High-Speed Scanning Beam */}
                   <AnimatePresence>
                     {isAnalyzing && (
                       <motion.div
                         key="scan-line"
                         initial={{ top: "-10%" }}
                         animate={{ top: "110%" }}
-                        transition={{ duration: 1.8, repeat: Infinity, ease: "linear" }}
-                        className="absolute left-0 right-0 h-1.5 bg-rose-400 shadow-[0_0_30px_rgba(244,63,94,0.8)] z-10 blur-[1px]"
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="absolute left-0 right-0 h-4 bg-rose-400 shadow-[0_0_50px_rgba(244,63,94,1)] z-10 blur-[2px]"
                       />
                     )}
                   </AnimatePresence>
@@ -399,7 +400,7 @@ export default function SkinCancer() {
                           {result.diagnosis}
                         </h2>
                         <VoiceAssistant 
-                          message={["High Risk", "Medium Risk", "Pre-cancer", "Low Risk"].includes(result.severity) ? "Skin disease detect hui hai. Kripya apne skin doctor ya Dermatologist se check karwain." : "Aapki skin completely healthy lag rahi hai."} 
+                          message={["High Risk", "Medium Risk", "Pre-cancer", "Low Risk"].includes(result.severity) ? "Potential skin lesion detected. Please consult a dermatologist for a clinical examination immediately." : "Your skin appears healthy. No significant concerning lesions were detected."} 
                           startSpeaking={true} 
                         />
                       </div>
@@ -484,12 +485,19 @@ export default function SkinCancer() {
 
                         {/* 2nd Row: Full Width Doctor Suggestion */}
                         <div className="w-full">
-                          <DoctorSuggestion diseaseType="SkinCancer" />
+                          <DoctorSuggestion 
+                            diseaseType="SkinCancer" 
+                            hospital={selectedHospital}
+                            onBook={() => setIsBookingOpen(true)}
+                          />
                         </div>
 
                         {/* 3rd Row: MASSIVE Full Width Horizontal Map */}
                         <div id="hospital-map" className="w-full rounded-[3rem] overflow-hidden shadow-3xl border border-slate-100 h-[600px]">
-                           <HospitalMap diseaseType="SkinCancer" />
+                           <HospitalMap 
+                             diseaseType="SkinCancer" 
+                             onHospitalSelect={setSelectedHospital}
+                           />
                         </div>
                       </motion.div>
                     )}
@@ -504,7 +512,13 @@ export default function SkinCancer() {
             </AnimatePresence>
           </div>
         </div>
-      </div>
+      <AppointmentBooking 
+        isOpen={isBookingOpen}
+        onClose={() => setIsBookingOpen(false)}
+        hospital={selectedHospital}
+        specialistType="Dermatologist"
+        patientInfo={{ name: patientName, age: patientAge, gender: patientGender }}
+      />
 
       {/* --- CUSTOM CSS SCROLLBAR --- */}
       <style dangerouslySetInnerHTML={{
@@ -513,7 +527,8 @@ export default function SkinCancer() {
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
-      `}} />
+      ` }} />
     </div>
+  </div>
   );
 }

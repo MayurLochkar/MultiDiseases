@@ -5,6 +5,7 @@ import VoiceAssistant from "../components/VoiceAssistant";
 import DoctorSuggestion from "../components/DoctorSuggestion";
 import HospitalMap from "../components/HospitalMap";
 import AdvancedReport from "../components/AdvancedReport";
+import AppointmentBooking from "../components/AppointmentBooking";
 
 export default function Pneumonia() {
   const [selectedImage, setSelectedImage] = useState(null);
@@ -14,6 +15,8 @@ export default function Pneumonia() {
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [selectedHospital, setSelectedHospital] = useState(null);
 
   // Handle image selection
   const handleImageChange = (e) => {
@@ -56,7 +59,7 @@ export default function Pneumonia() {
 
       const resultData = {
         prediction: data.prediction,
-        confidence: (data.confidence * 100).toFixed(2),
+        confidence: ((data.confidence || 0) * 100).toFixed(2),
         status: data.prediction === "PNEUMONIA" ? "positive" : "negative",
         details: "Prediction generated using trained CNN model.",
         gradcam: data.gradcam,
@@ -169,26 +172,45 @@ export default function Pneumonia() {
               </div>
             </div>
 
-            <label className="relative group cursor-pointer block">
-              <input type="file" className="hidden" onChange={handleImageChange} accept="image/*" />
+            {!preview ? (
+              <label className="cursor-pointer block">
+                <input type="file" className="hidden" onChange={handleImageChange} accept="image/*" />
+                <div className="border-2 border-dashed border-slate-200 rounded-[2rem] p-10 flex flex-col items-center hover:border-blue-400 hover:bg-slate-50 transition-all duration-300 group">
+                  <FaCloudUploadAlt className="text-6xl text-slate-300 group-hover:text-blue-500 transition-colors mb-4" />
+                  <p className="text-slate-600 font-semibold">Drop image here or click to browse</p>
+                </div>
+              </label>
+            ) : (
+              <div className="relative rounded-2xl overflow-hidden bg-slate-900 border-4 border-white shadow-xl group">
+                <img
+                  src={preview}
+                  alt="X-ray Preview"
+                  className="max-h-[400px] w-full object-contain opacity-90"
+                />
+                
+                {/* High-Speed Scanning Beam */}
+                <AnimatePresence>
+                  {loading && (
+                    <motion.div
+                      initial={{ top: "-10%" }}
+                      animate={{ top: "110%" }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="absolute left-0 right-0 h-4 bg-blue-400 shadow-[0_0_50px_rgba(59,130,246,1)] z-10 blur-[2px]"
+                    />
+                  )}
+                </AnimatePresence>
 
-              <div className={`border-2 border-dashed rounded-[2rem] p-10 flex flex-col items-center transition-all duration-300 ${
-                preview ? "border-blue-400 bg-blue-50/30" : "border-slate-200 hover:border-blue-400 hover:bg-slate-50"
-              }`}>
-                {!preview ? (
-                  <>
-                    <FaCloudUploadAlt className="text-6xl text-slate-300 group-hover:text-blue-500 transition-colors mb-4" />
-                    <p className="text-slate-600 font-semibold">Drop image here or click to browse</p>
-                  </>
-                ) : (
-                  <img
-                    src={preview}
-                    alt="X-ray Preview"
-                    className="rounded-2xl max-h-[300px] w-full object-cover shadow-lg border-4 border-white"
-                  />
-                )}
+                {/* Grid Overlay */}
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none"></div>
+
+                <button 
+                  onClick={() => { setPreview(null); setSelectedImage(null); setResult(null); }}
+                  className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white px-4 py-2 rounded-xl text-xs font-bold border border-white/10 transition-all opacity-0 group-hover:opacity-100"
+                >
+                  Change Image
+                </button>
               </div>
-            </label>
+            )}
 
             {preview && !loading && !result && (
               <motion.button
@@ -202,10 +224,10 @@ export default function Pneumonia() {
             )}
 
             {loading && (
-              <div className="mt-8 text-center">
-                <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-blue-600 font-bold animate-pulse">
-                  Our AI is scanning the X-ray pixels...
+              <div className="mt-8 text-center bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                <p className="text-blue-600 font-black text-sm uppercase tracking-tighter flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  Neural Lobe Segmentation in Progress...
                 </p>
               </div>
             )}
@@ -240,7 +262,7 @@ export default function Pneumonia() {
                       </p>
                       {/* Voice Assistant Module */}
                       <VoiceAssistant 
-                        message={result.status === "positive" ? "Aapko shayad Pneumonia ho sakta hai. Kripya Pulmonologist se consult karein." : "Koi pneumonia detect nahi hua, aap healthy hain."} 
+                        message={result.status === "positive" ? "Analysis detects potential pneumonia. Please consult a pulmonologist immediately." : "No signs of pneumonia detected. Your lungs appear clear."} 
                         startSpeaking={true} 
                       />
                     </div>
@@ -293,12 +315,19 @@ export default function Pneumonia() {
 
                       {/* 2nd Row: Full Width Doctor Suggestion */}
                       <div className="w-full">
-                        <DoctorSuggestion diseaseType="Pneumonia" />
+                        <DoctorSuggestion 
+                           diseaseType="Pneumonia" 
+                           hospital={selectedHospital}
+                           onBook={() => setIsBookingOpen(true)}
+                        />
                       </div>
 
                       {/* 3rd Row: MASSIVE Full Width Horizontal Map */}
                       <div id="hospital-map" className="w-full rounded-[3rem] overflow-hidden shadow-3xl border border-slate-100 h-[600px]">
-                        <HospitalMap diseaseType="Pneumonia" />
+                        <HospitalMap 
+                           diseaseType="Pneumonia" 
+                           onHospitalSelect={setSelectedHospital}
+                        />
                       </div>
                     </motion.div>
                   )}
@@ -335,6 +364,13 @@ export default function Pneumonia() {
           </div>
         </div>
       </div>
+      <AppointmentBooking 
+        isOpen={isBookingOpen}
+        onClose={() => setIsBookingOpen(false)}
+        hospital={selectedHospital}
+        specialistType="Pulmonologist"
+        patientInfo={{ name: patientName, age: patientAge, gender: patientGender }}
+      />
     </div>
   );
 }

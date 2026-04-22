@@ -22,8 +22,17 @@ app.use("/api/skin", skinRoute);
 app.use("/api/heart", heartRoute);
 app.use("/api/diabetes", diabetesRoute);
 app.use("/api/records", recordsRoute);
-app.use("/api/chat", chatRoute); // 🤖 xAI Grok proxy
+app.use("/api/chat", chatRoute);
+
+// 🔍 System Health Check (Stabilization)
+app.get("/api/health-check", (req, res) => {
+  res.json({ 
+    status: "ok", 
+    service: "MultiDiseases-AI-Backend",
+    timestamp: new Date().toISOString()
+  });
+});
 
 app.listen(5001, () => {
-  console.log("Node server running on port 5001");
+  console.log("🚀 MultiDiseases AI Server successfully started on port 5001");
 });
